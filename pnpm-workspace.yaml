@@ -1,0 +1,10 @@
+packages:
+  - "app"
+  - "ui"
+  - "refine"
+  - "metadata"
+  - "storybook"
+  - "e2e"
+allowBuilds:
+  esbuild: true
+  "@tailwindcss/oxide": true

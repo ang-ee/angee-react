@@ -1,0 +1,9 @@
+{
+  "name": "@angee/react-workspace",
+  "private": true,
+  "license": "LGPL-3.0-or-later",
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  }
+}
