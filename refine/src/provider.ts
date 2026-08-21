@@ -82,10 +82,53 @@ export function createAngeeGraphQLClient(
     endpoint: options.csrfEndpoint,
     fetch: baseFetch,
   });
-  return new GraphQLClient(options.url, {
-    fetch: auth(baseFetch),
-    headers: options.headers,
-  });
+  return withServerErrorMessages(
+    new GraphQLClient(options.url, {
+      fetch: auth(baseFetch),
+      headers: options.headers,
+    }),
+  );
+}
+
+/**
+ * graphql-request stringifies the entire response and request into the thrown
+ * error's `message` (`"<server message>: {"response":…,"request":…}"`), and
+ * Refine's notification provider renders `message` verbatim. Without this an
+ * ordinary permission denial puts the query source, its variables, and the
+ * model and field names into a toast. Rewrite `message` to the server's own
+ * text and publish the transport status as `statusCode`. The error object is
+ * mutated rather than replaced so `response`/`request` survive for callers that
+ * read them — the auth provider's 401 check is one.
+ */
+function withServerErrorMessages(client: GraphQLClient): GraphQLClient {
+  for (const method of ["request", "rawRequest"] as const) {
+    const original = client[method];
+    if (typeof original !== "function") continue;
+    const bound = original.bind(client) as (...args: unknown[]) => Promise<unknown>;
+    (client as unknown as Record<string, unknown>)[method] = (...args: unknown[]) =>
+      bound(...args).catch((error: unknown) => {
+        throw withServerErrorMessage(error);
+      });
+  }
+  return client;
+}
+
+function withServerErrorMessage(error: unknown): unknown {
+  const record = recordValue(error);
+  const response = recordValue(record?.response);
+  if (!record || !response) return error;
+  const errors = response["errors"];
+  const message = Array.isArray(errors)
+    ? stringValue(recordValue(errors[0])?.["message"])
+    : undefined;
+  if (!message) return error;
+  const target = error as { message: string; statusCode?: unknown };
+  target.message = message;
+  const status = response["status"];
+  if (target.statusCode === undefined && typeof status === "number") {
+    target.statusCode = status;
+  }
+  return error;
 }
 
 export function createAngeeHasuraDataProvider(
