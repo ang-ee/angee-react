@@ -4,8 +4,64 @@ import type { AngeeLiveResource } from "./provider";
 import {
   ANGEE_HASURA_PROVIDER_OPTIONS,
   createAngeeChangeLiveProvider,
+  createAngeeGraphQLClient,
   resolveGraphQLWebSocketEndpoint,
 } from "./provider";
+
+describe("GraphQL error messages", () => {
+  const denial = {
+    errors: [
+      {
+        message: "Platform admin permission required.",
+        path: ["impl_choices"],
+        extensions: { code: "PERMISSION_DENIED" },
+      },
+    ],
+    data: null,
+  };
+
+  function clientRejecting(body: unknown, status = 200) {
+    return createAngeeGraphQLClient({
+      url: "https://app.test/graphql/",
+      fetch: (async () =>
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { "content-type": "application/json" },
+        })) as typeof globalThis.fetch,
+    });
+  }
+
+  test("reports the server's message instead of the serialized request", async () => {
+    const client = clientRejecting(denial);
+    // graphql-request appends `: {"response":…,"request":…}` to the message, and
+    // Refine renders it verbatim — that is how the query source, its variables
+    // and the model names reached a toast.
+    const error = await client.request("query Q { impl_choices { key } }").catch((e: unknown) => e);
+    expect((error as Error).message).toBe("Platform admin permission required.");
+    expect((error as Error).message).not.toContain("impl_choices { key }");
+    expect((error as Error).message).not.toContain("\"response\"");
+  });
+
+  test("keeps response and request so 401 detection still works", async () => {
+    const client = clientRejecting({ errors: [{ message: "Signature expired." }] }, 401);
+    const error = (await client
+      .request("query Q { me { id } }")
+      .catch((e: unknown) => e)) as { response?: { status?: number }; statusCode?: number };
+    expect(error.response?.status).toBe(401);
+    expect(error.statusCode).toBe(401);
+  });
+
+  test("leaves errors without a GraphQL body untouched", async () => {
+    const client = createAngeeGraphQLClient({
+      url: "https://app.test/graphql/",
+      fetch: (async () => {
+        throw new Error("network down");
+      }) as typeof globalThis.fetch,
+    });
+    const error = await client.request("query Q { me { id } }").catch((e: unknown) => e);
+    expect((error as Error).message).toContain("network down");
+  });
+});
 
 describe("Angee Hasura provider defaults", () => {
   afterEach(() => {
