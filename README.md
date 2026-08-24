@@ -10,6 +10,7 @@ fragment composes:
   typed-document glue.
 - **`@angee/metadata`** — the `angee.resources` metadata bridge and projection.
 - **`@angee/ui`** — the rendered binding, primitives, runtime context, and views.
+- **`docs/`** — the Frontend Guidelines and end-to-end testing guide.
 - **`storybook/`** — the storybook-first component workshop (dev-only).
 - **`e2e/`** — the Playwright e2e harness (dev-only).
 
