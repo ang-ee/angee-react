@@ -21,3 +21,4 @@ jobs:
       - run: pnpm -r test
       - run: pnpm -r --filter='!@angee/storybook' build
       - run: node scripts/check-dist-imports.mjs
+      - run: node ui/scripts/check-views-exports.mjs
