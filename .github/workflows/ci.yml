@@ -19,3 +19,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r typecheck
       - run: pnpm -r test
+      - run: pnpm -r --filter='!@angee/storybook' build
+      - run: node scripts/check-dist-imports.mjs
