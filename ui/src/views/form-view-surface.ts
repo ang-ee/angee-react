@@ -16,6 +16,7 @@ import {
   parsePageActions,
   parsePageFields,
   parsePageGroups,
+  parsePageTabs,
   type ActionDescriptor,
   type FieldDescriptor,
   type GroupDescriptor,
@@ -185,6 +186,20 @@ export function useFormViewSurface({
       sectionEntries.flatMap((entry) =>
         parsePageActions(entry.content as React.ReactNode),
       ),
+    [sectionEntries],
+  );
+  const slotRecordTabs = React.useMemo<readonly RecordTabDescriptor[]>(
+    () =>
+      parsePageTabs(
+        sectionEntries.map((entry) => entry.content as React.ReactNode),
+      )
+        .filter((tab) => tab.hidden !== true)
+        .map((tab) => ({
+          id: tab.id,
+          label: tab.label,
+          ...(tab.icon !== undefined ? { icon: tab.icon } : {}),
+          render: () => tab.children,
+        })),
     [sectionEntries],
   );
   const isCreate = id == null;
@@ -382,7 +397,10 @@ export function useFormViewSurface({
       (save.displayRecord == null || !deleteVisibleWhen(save.displayRecord)))
       ? undefined
       : deleteAction;
-  const recordTabList = recordTabs ?? EMPTY_RECORD_TABS;
+  const recordTabList = React.useMemo(
+    () => mergeRecordTabs(recordTabs ?? EMPTY_RECORD_TABS, slotRecordTabs),
+    [recordTabs, slotRecordTabs],
+  );
 
   return {
     ...save,
@@ -410,4 +428,19 @@ export function useFormViewSurface({
     tabbed: recordPanelContext != null && recordTabList.length > 0,
     visibleDeleteAction,
   };
+}
+
+function mergeRecordTabs(
+  declared: readonly RecordTabDescriptor[],
+  contributed: readonly RecordTabDescriptor[],
+): readonly RecordTabDescriptor[] {
+  const tabs = [...declared, ...contributed];
+  const seen = new Set<string>();
+  for (const tab of tabs) {
+    if (seen.has(tab.id)) {
+      throw new Error(`FormView received duplicate record tab id "${tab.id}".`);
+    }
+    seen.add(tab.id);
+  }
+  return tabs;
 }
